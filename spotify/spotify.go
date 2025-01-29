@@ -6,11 +6,54 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"os/exec"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"golang.org/x/oauth2"
 )
+
+var authCodeChannel = make(chan string) // Channel to receive the authorization code
+
+// Open the authorization URL in the user's default browser
+func openBrowser(url string) error {
+	fmt.Println("Opening URL in browser:", url) // Debugging: Print the URL
+
+	var cmd string
+	var args []string
+
+	switch runtime.GOOS {
+	case "windows":
+		cmd = "powershell.exe"
+		args = []string{"Start-Process", url} // PowerShell on Windows
+	case "darwin":
+		cmd = "open"
+		args = []string{url}
+	case "linux":
+		// Detect if running inside WSL and use `wslview`
+		if isWSL() {
+			cmd = "wsl-open"
+		} else {
+			cmd = "xdg-open"
+		}
+		args = []string{url}
+	}
+
+	err := exec.Command(cmd, args...).Start()
+	if err != nil {
+		fmt.Println("Failed to open browser. Please manually visit:", url)
+	}
+	return err
+}
+
+// Detect if running inside WSL
+func isWSL() bool {
+	_, err := os.Stat("/proc/sys/fs/binfmt_misc/WSLInterop")
+	return err == nil
+
+}
 
 // Authenticate authenticates with Spotify and returns an HTTP client.
 func Authenticate(clientID, clientSecret, redirectURI string) (*http.Client, error) {
@@ -18,7 +61,7 @@ func Authenticate(clientID, clientSecret, redirectURI string) (*http.Client, err
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		RedirectURL:  redirectURI,
-		Scopes:       []string{"playlist-modify-public", "playlist-modify-private"},
+		Scopes:       []string{"playlist-modify-public", "playlist-modify-private", "playlist-read-private"},
 		Endpoint: oauth2.Endpoint{
 			AuthURL:  "https://accounts.spotify.com/authorize",
 			TokenURL: "https://accounts.spotify.com/api/token",
@@ -27,6 +70,13 @@ func Authenticate(clientID, clientSecret, redirectURI string) (*http.Client, err
 
 	// Redirect user to Spotify authorization page
 	authURL := conf.AuthCodeURL("state", oauth2.AccessTypeOffline)
+
+	fmt.Println("Opening browser for Spotify authentication...")
+	if err := openBrowser(authURL); err != nil {
+		fmt.Println("Failed to open browser. Please manually visit the URL below and enter the code after authorization:")
+		fmt.Println(authURL)
+	}
+
 	fmt.Printf("Visit the URL for the auth dialog: %v\n", authURL)
 
 	// After authorization, Spotify will redirect to the redirect URI with a code
@@ -40,10 +90,63 @@ func Authenticate(clientID, clientSecret, redirectURI string) (*http.Client, err
 		return nil, err
 	}
 
+	// Print the access token
+	fmt.Println("Access Token:", token.AccessToken)
+	fmt.Println("Refresh Token:", token.RefreshToken)
+	fmt.Println("Expires In:", token.Expiry)
+
 	// Create an HTTP client using the token
 	client := conf.Client(context.Background(), token)
 
 	return client, nil
+}
+
+func CheckOrCreatePlaylist(client *http.Client, name string) (string, error) {
+	userId, err := getSpotifyUserID(client)
+	if err != nil {
+		return "", err
+	}
+	fmt.Println("User ID:", userId)
+	// Check existing playlists
+	req, err := http.NewRequest("GET", "https://api.spotify.com/v1/me/playlists", nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var playlists struct {
+		Items []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"items"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&playlists); err != nil {
+		return "", err
+	}
+
+	// Print playlists
+	fmt.Println("Existing Spotify Playlists:")
+	for _, playlist := range playlists.Items {
+		fmt.Printf("- %s (ID: %s)\n", playlist.Name, playlist.ID)
+	}
+
+	// Check if the playlist already exists
+	for _, playlist := range playlists.Items {
+		if playlist.Name == name {
+			fmt.Println("Playlist already exists:", playlist.Name)
+			return playlist.ID, nil
+		}
+	}
+
+	// If playlist does not exist, create it
+	return CreatePlaylist(client, name)
 }
 
 // CreatePlaylist creates a new Spotify playlist and returns its ID.
@@ -55,8 +158,8 @@ func CreatePlaylist(client *http.Client, name string) (string, error) {
 
 	reqBody := map[string]interface{}{
 		"name":        name,
-		"description": "Playlist imported from YouTube",
-		"public":      false,
+		"description": "Playlist imported",
+		"public":      true,
 	}
 
 	reqBodyJSON, err := json.Marshal(reqBody)
