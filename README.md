@@ -69,6 +69,16 @@ PLAYLIST_NAME_TO_SAVE=name
 
 ---
 
+
+
+## Ollama Integration for Song and Artist Name Extraction
+This project now supports Ollama, a local AI-powered service, to improve track matching accuracy by extracting clean song titles and artist names.
+
+### How It Works
+The tool utilizes Ollama to intelligently extract the correct song title and artist.
+Ensures better search results when querying the Spotify API.
+### Setup for Ollama
+Ensure that Ollama is installed and running on your local machine. If it's running it will take the LLM in use as consideration.
 ## Error Handling
 
 - Logs are generated for any tracks that couldn't be matched.
