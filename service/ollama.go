@@ -1,4 +1,4 @@
-package model
+package service
 
 import (
 	"bytes"
@@ -10,22 +10,42 @@ import (
 	"time"
 )
 
+// OllamaService defines the interface for the Ollama API interaction.
+type OllamaService interface {
+	AiService
+	IsOllamaAvailable() bool
+}
+
+// OllamaServiceImpl implements OllamaService.
+type OllamaServiceImpl struct {
+	apiURL string
+	model  string
+}
+
+// OllamaRequest represents the request payload for Ollama.
 type OllamaRequest struct {
-	Model  string `json:"model"`
+	Model  string `json:"service"`
 	Prompt string `json:"prompt"`
 }
 
+// OllamaResponse represents the response from Ollama.
 type OllamaResponse struct {
 	Response string `json:"response"`
 }
 
-// Ollama API URL
-const ollamaAPI = "http://localhost:11434/api/tags"
+// NewOllamaService initializes a new OllamaServiceImpl.
+func NewOllamaService() OllamaService {
+	//todo: check model
+	return &OllamaServiceImpl{
+		apiURL: "http://localhost:11434/api/generate",
+		model:  "llama3.2",
+	}
+}
 
-// Check if Ollama is running
-func IsOllamaAvailable() bool {
+// IsOllamaAvailable checks if the Ollama API is running.
+func (o *OllamaServiceImpl) IsOllamaAvailable() bool {
 	client := http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Get(ollamaAPI)
+	resp, err := client.Get("http://localhost:11434/api/tags")
 	if err != nil {
 		return false
 	}
@@ -33,19 +53,19 @@ func IsOllamaAvailable() bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-// ExtractSongArtist calls Ollama and extracts the song and artist from the response
-func ExtractSongArtist(videoTitle string) (string, string, error) {
+// ExtractSongArtist calls Ollama and extracts the song and artist from the response.
+func (o *OllamaServiceImpl) ExtractSongArtist(videoTitle string) (string, string, error) {
 	// Define the prompt
 	prompt := fmt.Sprintf("Extract the song title and artist from this YouTube video title: '%s'. Return it in the format: Song: <song_name>, Artist: <artist_name>.", videoTitle)
 
 	// Prepare JSON request body
 	requestBody, _ := json.Marshal(OllamaRequest{
-		Model:  "llama3.2",
+		Model:  o.model,
 		Prompt: prompt,
 	})
 
 	// Send HTTP request to Ollama
-	resp, err := http.Post("http://localhost:11434/api/generate", "application/json", bytes.NewBuffer(requestBody))
+	resp, err := http.Post(o.apiURL, "application/json", bytes.NewBuffer(requestBody))
 	if err != nil {
 		fmt.Println("Error sending request to Ollama:", err)
 		return "", "", err
@@ -82,7 +102,7 @@ func ExtractSongArtist(videoTitle string) (string, string, error) {
 	return song, artist, nil
 }
 
-// parseOllamaResponse extracts the song title and artist name from Ollama response
+// parseOllamaResponse extracts the song title and artist name from Ollama response.
 func parseOllamaResponse(response string) (string, string) {
 	// Trim spaces and normalize response
 	response = strings.TrimSpace(response)
@@ -100,14 +120,4 @@ func parseOllamaResponse(response string) (string, string) {
 
 	// Return empty values if parsing fails
 	return "", ""
-}
-
-// Example usage
-func Run(videoTitle string) {
-	song, artist, err := ExtractSongArtist(videoTitle)
-	if err != nil {
-		fmt.Println("Error:", err)
-	} else {
-		fmt.Printf("xtracted Song: %s, Artist: %s\n", song, artist)
-	}
 }

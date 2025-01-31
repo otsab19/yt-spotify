@@ -1,10 +1,11 @@
-package main
+package config
 
 import (
 	"encoding/json"
 	"fmt"
 	"github.com/joho/godotenv"
 	"os"
+	"yt-spotify/utils"
 )
 
 type AppContext struct {
@@ -14,9 +15,13 @@ type AppContext struct {
 	SpotifyRedirectURI  string
 	Playlists           []string
 	PlayListsNameToSave string
+	MistralApiKey       string
+	ModelToUse          string
 }
 
-func LoadConfig() (*AppContext, error) {
+var appContext *AppContext
+
+func GetConfig() (*AppContext, error) {
 	err := godotenv.Load()
 	if err != nil {
 		return nil, fmt.Errorf("error loading .env file: %w", err)
@@ -35,6 +40,13 @@ func LoadConfig() (*AppContext, error) {
 		playListsName = "Playlist"
 	}
 
+	var model string
+	if os.Getenv("MODEL_TO_USE") == "mistral" {
+		model = utils.MISTRAL
+	} else if os.Getenv("MODEL_TO_USE") == "ollama" {
+		model = utils.OLLAMA
+	}
+
 	return &AppContext{
 		YouTubeAPIKey:       os.Getenv("YOUTUBE_API_KEY"),
 		SpotifyClientID:     os.Getenv("SPOTIFY_CLIENT_ID"),
@@ -42,5 +54,25 @@ func LoadConfig() (*AppContext, error) {
 		SpotifyRedirectURI:  os.Getenv("SPOTIFY_REDIRECT_URI"),
 		PlayListsNameToSave: playListsName,
 		Playlists:           playlists,
+		MistralApiKey:       os.Getenv("MISTRAL_API_KEY"),
+		ModelToUse:          model,
 	}, nil
+}
+
+func GetAppContext() *AppContext {
+	if appContext == nil {
+		panic("AppContext is not initialized. Call LoadConfig() first.")
+	}
+	return appContext
+}
+
+func LoadConfig() {
+	ctx, err := GetConfig()
+	appContext = ctx
+	if err != nil {
+		fmt.Println("Failed to load config:", err)
+		panic("Failed to load config.")
+		return
+	}
+
 }

@@ -1,12 +1,14 @@
-// main.go
 package main
 
 import (
 	"fmt"
 	"os"
+	"yt-spotify/config"
 )
 
 func main() {
+	//init config
+	config.LoadConfig()
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "yt-spotify":

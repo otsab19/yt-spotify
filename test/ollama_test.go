@@ -56,14 +56,14 @@ func ExtractSongArtistFromOllama(videoTitle, apiURL string) (string, string, err
 
 	// Prepare JSON request body
 	requestBody, _ := json.Marshal(map[string]string{
-		"model":  "llama3.2", // Ensure this matches the running model
-		"prompt": prompt,
+		"service": "llama3.2", // Ensure this matches the running service
+		"prompt":  prompt,
 	})
 
 	// Send HTTP request to Ollama
 	resp, err := http.Post(apiURL, "application/json", bytes.NewBuffer(requestBody))
 	if err != nil {
-		fmt.Println("❌ Error sending request to Ollama:", err)
+		fmt.Println("Error sending request to Ollama:", err)
 		return "", "", err
 	}
 	defer resp.Body.Close()
@@ -81,7 +81,7 @@ func ExtractSongArtistFromOllama(videoTitle, apiURL string) (string, string, err
 		// Decode each JSON chunk
 		err := decoder.Decode(&chunk)
 		if err != nil {
-			fmt.Println("❌ Error decoding Ollama JSON chunk:", err)
+			fmt.Println("Error decoding Ollama JSON chunk:", err)
 			return "", "", err
 		}
 
@@ -97,13 +97,11 @@ func ExtractSongArtistFromOllama(videoTitle, apiURL string) (string, string, err
 	// Convert response to string
 	responseText := strings.TrimSpace(fullResponse.String())
 
-	// 🔥 Debugging: Print the full accumulated response
 	fmt.Println("🟢 Full Ollama Response:", responseText)
 
 	// Extract song and artist from response
 	song, artist := parseOllamaResponse(responseText)
 
-	// 🔥 Debugging: Print extracted values
 	fmt.Println("🟢 Extracted Song:", song)
 	fmt.Println("🟢 Extracted Artist:", artist)
 

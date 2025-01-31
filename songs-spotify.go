@@ -5,14 +5,12 @@ import (
 	"log"
 	"os"
 	"strings"
+	"yt-spotify/config"
 	"yt-spotify/spotify"
 )
 
 func SongsToSpotify() {
-	appCtx, err := LoadConfig()
-	if err != nil {
-		log.Fatalf("Failed to load environment variables: %v", err)
-	}
+	appCtx := config.GetAppContext()
 
 	files, err := os.ReadDir("inputFiles")
 	if err != nil {
