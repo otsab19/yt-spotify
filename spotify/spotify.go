@@ -16,6 +16,43 @@ import (
 
 var authCodeChannel = make(chan string) // Channel to receive the authorization code
 
+// ExtractPort extracts the port from a localhost redirect URI
+func extractPort(redirectURI string) string {
+	parsedURL, err := url.Parse(redirectURI)
+	if err != nil {
+		fmt.Println("Error parsing redirect URI:", err)
+		return "8087" // Default fallback port
+	}
+
+	port := parsedURL.Port()
+	if port == "" {
+		return "8087" // Default port if not specified
+	}
+	return port
+}
+
+// Start a local server to capture the auth code from the redirect
+func startAuthServer(port string) {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		code := query.Get("code")
+		if code != "" {
+			fmt.Fprintln(w, "Authorization successful! You can close this window.")
+			authCodeChannel <- code // Send the code to the main function
+		} else {
+			fmt.Fprintln(w, "Authorization failed. No code received.")
+		}
+	})
+
+	address := fmt.Sprintf(":%s", port)
+	fmt.Println("Starting local server on http://localhost:" + address)
+	go func() {
+		if err := http.ListenAndServe(address, nil); err != nil {
+			fmt.Println("Error starting server:", err)
+		}
+	}()
+}
+
 // Open the authorization URL in the user's default browser
 func openBrowser(url string) error {
 	fmt.Println("Opening URL in browser:", url) // Debugging: Print the URL
@@ -66,6 +103,13 @@ func Authenticate(clientID, clientSecret, redirectURI string) (*http.Client, err
 			TokenURL: "https://accounts.spotify.com/api/token",
 		},
 	}
+	var isLocal bool = false
+	// if its local run local server
+	if strings.HasPrefix(redirectURI, "http://localhost") {
+		port := extractPort(redirectURI)
+		startAuthServer(port)
+		isLocal = true
+	}
 
 	// Redirect user to Spotify authorization page
 	authURL := conf.AuthCodeURL("state", oauth2.AccessTypeOffline)
@@ -75,24 +119,23 @@ func Authenticate(clientID, clientSecret, redirectURI string) (*http.Client, err
 		fmt.Println("Failed to open browser. Please manually visit the URL below and enter the code after authorization:")
 		fmt.Println(authURL)
 	}
-
-	fmt.Printf("Visit the URL for the auth dialog: %v\n", authURL)
-
-	// After authorization, Spotify will redirect to the redirect URI with a code
-	fmt.Print("Enter the code from the redirect URL: ")
 	var code string
-	fmt.Scanln(&code)
+	if isLocal {
+		// Wait for the authorization code to be received from the local server
+		code = <-authCodeChannel
+	} else {
+
+		fmt.Printf("Visit the URL for the auth dialog: %v\n", authURL)
+		// After authorization, Spotify will redirect to the redirect URI with a code
+		fmt.Print("Enter the code from the redirect URL: ")
+		fmt.Scanln(&code)
+	}
 
 	// Exchange the code for a token
 	token, err := conf.Exchange(context.Background(), code)
 	if err != nil {
 		return nil, err
 	}
-
-	// Print the access token
-	fmt.Println("Access Token:", token.AccessToken)
-	fmt.Println("Refresh Token:", token.RefreshToken)
-	fmt.Println("Expires In:", token.Expiry)
 
 	// Create an HTTP client using the token
 	client := conf.Client(context.Background(), token)
@@ -295,6 +338,17 @@ func SearchTrack(client *http.Client, trackName, artistName string) (string, err
 
 // AddTrackToPlaylist adds a track to a Spotify playlist.
 func AddTrackToPlaylist(client *http.Client, playlistID, trackID string) error {
+
+	exists, err := IsTrackInPlaylist(client, playlistID, trackID)
+	if err != nil {
+		return err
+	}
+
+	if exists {
+		fmt.Println("🟢 Track already exists in playlist, skipping addition.")
+		return nil
+	}
+
 	reqBody := map[string]interface{}{
 		"uris": []string{fmt.Sprintf("spotify:track:%s", trackID)},
 	}
@@ -321,4 +375,41 @@ func AddTrackToPlaylist(client *http.Client, playlistID, trackID string) error {
 	}
 
 	return nil
+}
+
+func IsTrackInPlaylist(client *http.Client, playlistID, trackID string) (bool, error) {
+	url := fmt.Sprintf("https://api.spotify.com/v1/playlists/%s/tracks", playlistID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	// Step 2: Parse response
+	var result struct {
+		Items []struct {
+			Track struct {
+				ID string `json:"id"`
+			} `json:"track"`
+		} `json:"items"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return false, err
+	}
+
+	for _, item := range result.Items {
+		if item.Track.ID == trackID {
+			return true, nil // Track exists
+		}
+	}
+
+	return false, nil // Track not found
 }

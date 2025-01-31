@@ -38,7 +38,7 @@ func TestExtractSongArtistWithOllama(t *testing.T) {
 			t.Errorf("For title '%s', expected format '%s', but got '%s'",
 				tc.videoTitle, tc.expectedFormat, responseFormat)
 		} else {
-			fmt.Printf("✅ Test passed for '%s': %s\n", tc.videoTitle, responseFormat)
+			fmt.Printf("Test passed for '%s': %s\n", tc.videoTitle, responseFormat)
 		}
 	}
 }
@@ -97,13 +97,13 @@ func ExtractSongArtistFromOllama(videoTitle, apiURL string) (string, string, err
 	// Convert response to string
 	responseText := strings.TrimSpace(fullResponse.String())
 
-	fmt.Println("🟢 Full Ollama Response:", responseText)
+	fmt.Println("Full Ollama Response:", responseText)
 
 	// Extract song and artist from response
 	song, artist := parseOllamaResponse(responseText)
 
-	fmt.Println("🟢 Extracted Song:", song)
-	fmt.Println("🟢 Extracted Artist:", artist)
+	fmt.Println("Extracted Song:", song)
+	fmt.Println("Extracted Artist:", artist)
 
 	return song, artist, nil
 }

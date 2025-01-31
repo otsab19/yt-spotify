@@ -84,10 +84,11 @@ func processYouTubePlaylist(youtubeService *youtubeV3.Service, spotifyClient *ht
 	for _, item := range playlistItems {
 		trackName := item.Snippet.Title
 		artistName := item.Snippet.VideoOwnerChannelTitle
+		description := item.Snippet.Description
 
 		// Use LLM
 		if aiService != nil {
-			extractedTrack, extractedArtist, err := aiService.ExtractSongArtist(trackName)
+			extractedTrack, extractedArtist, err := aiService.ExtractSongArtist(trackName + " " + description)
 			if err == nil {
 				trackName = extractedTrack
 				artistName = extractedArtist

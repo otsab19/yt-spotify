@@ -108,5 +108,5 @@ func TestExtractSongArtist_UnusualInput(t *testing.T) {
 	assert.NotEmpty(t, artist, "Extracted artist name should not be empty")
 
 	// Print results
-	log.Printf("✅ Extracted Song: %s, Artist: %s\n", song, artist)
+	log.Printf("Extracted Song: %s, Artist: %s\n", song, artist)
 }

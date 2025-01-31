@@ -24,7 +24,7 @@ type OllamaServiceImpl struct {
 
 // OllamaRequest represents the request payload for Ollama.
 type OllamaRequest struct {
-	Model  string `json:"service"`
+	Model  string `json:"model"`
 	Prompt string `json:"prompt"`
 }
 
