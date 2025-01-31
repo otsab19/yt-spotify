@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/oauth2"
 	"net/http"
 	"net/url"
 	"os"
@@ -11,8 +12,6 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
-
-	"golang.org/x/oauth2"
 )
 
 var authCodeChannel = make(chan string) // Channel to receive the authorization code

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 	"time"
+	"yt-spotify/model"
 	"yt-spotify/spotify"
 	"yt-spotify/youtube"
 
@@ -60,11 +61,20 @@ func processYouTubePlaylist(youtubeService *youtubeV3.Service, spotifyClient *ht
 		log.Printf("Unable to find or create Spotify playlist for %s: %v", playlistID, err)
 		return
 	}
-
+	var isLLmAvailable bool = false
+	if model.IsOllamaAvailable() == true {
+		isLLmAvailable = true
+	}
 	for _, item := range playlistItems {
 		trackName := item.Snippet.Title
 		artistName := item.Snippet.VideoOwnerChannelTitle
-
+		if isLLmAvailable == true {
+			trackName, artistName, err = model.ExtractSongArtist(trackName)
+			if err != nil {
+				trackName = item.Snippet.Title
+				artistName = item.Snippet.VideoOwnerChannelTitle
+			}
+		}
 		trackID, err := spotify.SearchTrack(spotifyClient, trackName, artistName)
 		if err != nil {
 			log.Printf("Unable to find track '%s' by '%s' on Spotify: %v", trackName, artistName, err)
